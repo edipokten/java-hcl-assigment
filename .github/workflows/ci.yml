@@ -13,13 +13,13 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_DB: app
-          POSTGRES_USER: app
-          POSTGRES_PASSWORD: app
+          POSTGRES_DB: quarkus_test
+          POSTGRES_USER: quarkus_test
+          POSTGRES_PASSWORD: quarkus_test
         ports:
-          - 5432:5432
+          - 15432:5432
         options: >-
-          --health-cmd="pg_isready -U app -d app"
+          --health-cmd="pg_isready -U quarkus_test -d quarkus_test"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -36,9 +36,9 @@ jobs:
 
       - name: Run tests (unit + integration)
         env:
-          QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://localhost:5432/app
-          QUARKUS_DATASOURCE_USERNAME: app
-          QUARKUS_DATASOURCE_PASSWORD: app
+          QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://localhost:15432/quarkus_test
+          QUARKUS_DATASOURCE_USERNAME: quarkus_test
+          QUARKUS_DATASOURCE_PASSWORD: quarkus_test
         run: ./mvnw -B clean verify
 
       - name: Upload JaCoCo report
