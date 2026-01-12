@@ -28,6 +28,7 @@ import org.jboss.logging.Logger;
 public class StoreResource {
 
   @Inject LegacyStoreManagerGateway legacyStoreManagerGateway;
+  @Inject AfterCommitExecutor afterCommitExecutor;
 
   private static final Logger LOGGER = Logger.getLogger(StoreResource.class.getName());
 
@@ -55,7 +56,8 @@ public class StoreResource {
 
     store.persist();
 
-    legacyStoreManagerGateway.createStoreOnLegacySystem(store);
+    Store snapshot = snapshotOf(store);
+    afterCommitExecutor.runAfterCommit(() -> legacyStoreManagerGateway.createStoreOnLegacySystem(snapshot));
 
     return Response.ok(store).status(201).build();
   }
@@ -69,7 +71,6 @@ public class StoreResource {
     }
 
     Store entity = Store.findById(id);
-
     if (entity == null) {
       throw new WebApplicationException("Store with id of " + id + " does not exist.", 404);
     }
@@ -77,7 +78,8 @@ public class StoreResource {
     entity.name = updatedStore.name;
     entity.quantityProductsInStock = updatedStore.quantityProductsInStock;
 
-    legacyStoreManagerGateway.updateStoreOnLegacySystem(updatedStore);
+    Store snapshot = snapshotOf(entity);
+    afterCommitExecutor.runAfterCommit(() -> legacyStoreManagerGateway.updateStoreOnLegacySystem(snapshot));
 
     return entity;
   }
@@ -91,22 +93,30 @@ public class StoreResource {
     }
 
     Store entity = Store.findById(id);
-
     if (entity == null) {
       throw new WebApplicationException("Store with id of " + id + " does not exist.", 404);
     }
 
-    if (entity.name != null) {
-      entity.name = updatedStore.name;
-    }
+    // name is mandatory here, so always update it
+    entity.name = updatedStore.name;
 
-    if (entity.quantityProductsInStock != 0) {
+    // treat "0" as "not provided" for PATCH (keeps existing value)
+    if (updatedStore.quantityProductsInStock != 0) {
       entity.quantityProductsInStock = updatedStore.quantityProductsInStock;
     }
 
-    legacyStoreManagerGateway.updateStoreOnLegacySystem(updatedStore);
+    Store snapshot = snapshotOf(entity);
+    afterCommitExecutor.runAfterCommit(() -> legacyStoreManagerGateway.updateStoreOnLegacySystem(snapshot));
 
     return entity;
+  }
+
+  private Store snapshotOf(Store source) {
+    Store snapshot = new Store();
+    snapshot.id = source.id;
+    snapshot.name = source.name;
+    snapshot.quantityProductsInStock = source.quantityProductsInStock;
+    return snapshot;
   }
 
   @DELETE
