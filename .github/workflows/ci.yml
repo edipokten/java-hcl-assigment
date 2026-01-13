@@ -11,7 +11,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:13.3
         env:
           POSTGRES_DB: quarkus_test
           POSTGRES_USER: quarkus_test
