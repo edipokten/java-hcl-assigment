@@ -25,6 +25,9 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
   public void create(Warehouse warehouse) {
     validateRequiredFields(warehouse);
 
+    warehouse.businessUnitCode = warehouse.businessUnitCode.trim();
+    warehouse.location = warehouse.location.trim();
+
     // Business Unit Code must be unique
     Warehouse existing = warehouseStore.findByBusinessUnitCode(warehouse.businessUnitCode);
     if (existing != null) {

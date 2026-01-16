@@ -87,6 +87,88 @@ public class CreateWarehouseUseCaseTest {
         assertEquals(409, ex.getResponse().getStatus());
     }
 
+    @Test
+    void create_whenLocationMaxWarehousesReached_should409() {
+        var store = new InMemoryWarehouseStore();
+        var resolver = new MapLocationResolver(Map.of("TILBURG-001", new Location("TILBURG-001", 1, 40)));
+        var useCase = new CreateWarehouseUseCase(store, resolver);
+
+        var existing = new Warehouse();
+        existing.businessUnitCode = "MWH.100";
+        existing.location = "TILBURG-001";
+        existing.capacity = 10;
+        existing.stock = 5;
+        store.create(existing);
+
+        var w = new Warehouse();
+        w.businessUnitCode = "MWH.101";
+        w.location = "TILBURG-001";
+        w.capacity = 10;
+        w.stock = 5;
+
+        var ex = assertThrows(WebApplicationException.class, () -> useCase.create(w));
+        assertEquals(409, ex.getResponse().getStatus());
+    }
+
+    @Test
+    void create_whenLocationCapacityExceeded_should409() {
+        var store = new InMemoryWarehouseStore();
+        var resolver = new MapLocationResolver(Map.of("EINDHOVEN-001", new Location("EINDHOVEN-001", 2, 70)));
+        var useCase = new CreateWarehouseUseCase(store, resolver);
+
+        var existing = new Warehouse();
+        existing.businessUnitCode = "MWH.200";
+        existing.location = "EINDHOVEN-001";
+        existing.capacity = 50;
+        existing.stock = 25;
+        store.create(existing);
+
+        var w = new Warehouse();
+        w.businessUnitCode = "MWH.201";
+        w.location = "EINDHOVEN-001";
+        w.capacity = 25;
+        w.stock = 10;
+
+        var ex = assertThrows(WebApplicationException.class, () -> useCase.create(w));
+        assertEquals(409, ex.getResponse().getStatus());
+    }
+
+    @Test
+    void create_whenCapacityExceedsLocationMax_should409() {
+        var store = new InMemoryWarehouseStore();
+        var resolver = new MapLocationResolver(Map.of("HELMOND-001", new Location("HELMOND-001", 2, 45)));
+        var useCase = new CreateWarehouseUseCase(store, resolver);
+
+        var w = new Warehouse();
+        w.businessUnitCode = "MWH.300";
+        w.location = "HELMOND-001";
+        w.capacity = 46;
+        w.stock = 10;
+
+        var ex = assertThrows(WebApplicationException.class, () -> useCase.create(w));
+        assertEquals(409, ex.getResponse().getStatus());
+    }
+
+    @Test
+    void create_whenFieldsHaveWhitespace_shouldTrimBeforePersisting() {
+        var store = new InMemoryWarehouseStore();
+        var resolver = new MapLocationResolver(Map.of("AMSTERDAM-001", new Location("AMSTERDAM-001", 5, 100)));
+        var useCase = new CreateWarehouseUseCase(store, resolver);
+
+        var w = new Warehouse();
+        w.businessUnitCode = " MWH.TRIM ";
+        w.location = " AMSTERDAM-001 ";
+        w.capacity = 10;
+        w.stock = 1;
+
+        useCase.create(w);
+
+        Warehouse created = store.findByBusinessUnitCode("MWH.TRIM");
+        assertNotNull(created);
+        assertEquals("MWH.TRIM", created.businessUnitCode);
+        assertEquals("AMSTERDAM-001", created.location);
+    }
+
     // --- minimal fakes ---
     static class MapLocationResolver implements LocationResolver {
         private final Map<String, Location> map;
