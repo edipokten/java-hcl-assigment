@@ -93,6 +93,36 @@ class CreateWarehouseUseCaseTest {
     assertEquals(409, ex.getResponse().getStatus());
   }
 
+  @Test
+  void shouldRejectWhenMaxWarehousesReachedForLocation() {
+    FakeWarehouseStore store = new FakeWarehouseStore();
+    LocationResolver resolver = id -> new Location("AMSTERDAM-001", 2, 100);
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse existingOne = new Warehouse();
+    existingOne.businessUnitCode = "BU-010";
+    existingOne.location = "AMSTERDAM-001";
+    existingOne.capacity = 20;
+    existingOne.stock = 10;
+    store.entries.add(existingOne);
+
+    Warehouse existingTwo = new Warehouse();
+    existingTwo.businessUnitCode = "BU-011";
+    existingTwo.location = "AMSTERDAM-001";
+    existingTwo.capacity = 20;
+    existingTwo.stock = 10;
+    store.entries.add(existingTwo);
+
+    Warehouse input = new Warehouse();
+    input.businessUnitCode = "BU-012";
+    input.location = "AMSTERDAM-001";
+    input.capacity = 10;
+    input.stock = 5;
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.create(input));
+    assertEquals(409, ex.getResponse().getStatus());
+  }
+
   private static final class FakeWarehouseStore implements WarehouseStore {
     private final List<Warehouse> entries = new ArrayList<>();
 
