@@ -105,6 +105,84 @@ public class ReplaceWarehouseUseCaseTest {
         assertEquals(1, store.findAllByBusinessUnitCode("MWH.020").size());
     }
 
+    @Test
+    void replace_whenInvalidLocation_should422() {
+        var store = new InMemoryWarehouseStore();
+        var resolver = new MapLocationResolver(Collections.emptyMap());
+        var useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+        var current = new Warehouse();
+        current.businessUnitCode = "MWH.030";
+        current.location = "AMSTERDAM-001";
+        current.capacity = 50;
+        current.stock = 40;
+        store.create(current);
+
+        var replacement = new Warehouse();
+        replacement.businessUnitCode = "MWH.030";
+        replacement.location = "UNKNOWN";
+        replacement.capacity = 60;
+        replacement.stock = 40;
+
+        var ex = assertThrows(WebApplicationException.class, () -> useCase.replace(replacement));
+        assertEquals(422, ex.getResponse().getStatus());
+    }
+
+    @Test
+    void replace_whenTargetLocationMaxWarehousesReached_should409() {
+        var store = new InMemoryWarehouseStore();
+        var resolver =
+                new MapLocationResolver(Map.of("ZWOLLE-002", new Location("ZWOLLE-002", 1, 50)));
+        var useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+        var current = new Warehouse();
+        current.businessUnitCode = "MWH.040";
+        current.location = "AMSTERDAM-001";
+        current.capacity = 20;
+        current.stock = 10;
+        store.create(current);
+
+        var existingAtTarget = new Warehouse();
+        existingAtTarget.businessUnitCode = "MWH.041";
+        existingAtTarget.location = "ZWOLLE-002";
+        existingAtTarget.capacity = 20;
+        existingAtTarget.stock = 10;
+        store.create(existingAtTarget);
+
+        var replacement = new Warehouse();
+        replacement.businessUnitCode = "MWH.040";
+        replacement.location = "ZWOLLE-002";
+        replacement.capacity = 20;
+        replacement.stock = 10;
+
+        var ex = assertThrows(WebApplicationException.class, () -> useCase.replace(replacement));
+        assertEquals(409, ex.getResponse().getStatus());
+    }
+
+    @Test
+    void replace_whenTargetLocationCapacityExceeded_should409() {
+        var store = new InMemoryWarehouseStore();
+        var resolver =
+                new MapLocationResolver(Map.of("AMSTERDAM-002", new Location("AMSTERDAM-002", 3, 75)));
+        var useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+        var current = new Warehouse();
+        current.businessUnitCode = "MWH.050";
+        current.location = "AMSTERDAM-002";
+        current.capacity = 50;
+        current.stock = 40;
+        store.create(current);
+
+        var replacement = new Warehouse();
+        replacement.businessUnitCode = "MWH.050";
+        replacement.location = "AMSTERDAM-002";
+        replacement.capacity = 80;
+        replacement.stock = 40;
+
+        var ex = assertThrows(WebApplicationException.class, () -> useCase.replace(replacement));
+        assertEquals(409, ex.getResponse().getStatus());
+    }
+
     // --- minimal fakes ---
 
     static class MapLocationResolver implements LocationResolver {
