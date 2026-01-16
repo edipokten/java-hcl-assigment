@@ -72,6 +72,29 @@ class ReplaceWarehouseUseCaseTest {
   }
 
   @Test
+  void shouldRejectInvalidLocation() {
+    FakeWarehouseStore store = new FakeWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU-250";
+    current.location = "AMSTERDAM-002";
+    current.capacity = 20;
+    current.stock = 10;
+    store.entries.add(current);
+
+    LocationResolver resolver = id -> null;
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU-250";
+    replacement.location = "UNKNOWN";
+    replacement.capacity = 30;
+    replacement.stock = 10;
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.replace(replacement));
+    assertEquals(422, ex.getResponse().getStatus());
+  }
+
+  @Test
   void shouldRejectLocationCapacityOverflow() {
     FakeWarehouseStore store = new FakeWarehouseStore();
     Warehouse current = new Warehouse();
