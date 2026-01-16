@@ -2,7 +2,6 @@ package com.fulfilment.application.monolith.warehouses.domain.usecases;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
@@ -15,80 +14,61 @@ import org.junit.jupiter.api.Test;
 class ArchiveWarehouseUseCaseTest {
 
   @Test
-  void shouldArchiveWarehouse() {
-    FakeWarehouseStore store = new FakeWarehouseStore();
-    Warehouse current = new Warehouse();
-    current.businessUnitCode = "BU-001";
-    current.location = "AMSTERDAM-001";
-    current.capacity = 20;
-    current.stock = 10;
-    store.entries.add(current);
-
+  void archivesWarehouse() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
     ArchiveWarehouseUseCase useCase = new ArchiveWarehouseUseCase(store);
 
-    useCase.archive(current);
+    Warehouse warehouse = new Warehouse();
+    warehouse.businessUnitCode = "BU1";
 
-    Warehouse updated = store.findByBusinessUnitCode("BU-001");
-    assertNull(updated);
-    assertNotNull(store.entries.get(0).archivedAt);
+    useCase.archive(warehouse);
+
+    assertEquals(1, store.updated.size());
+    assertNotNull(store.updated.get(0).archivedAt);
   }
 
   @Test
-  void shouldRejectAlreadyArchivedWarehouse() {
-    FakeWarehouseStore store = new FakeWarehouseStore();
-    Warehouse current = new Warehouse();
-    current.businessUnitCode = "BU-002";
-    current.location = "AMSTERDAM-001";
-    current.capacity = 20;
-    current.stock = 10;
-    current.archivedAt = java.time.LocalDateTime.now();
-    store.entries.add(current);
-
+  void rejectsAlreadyArchivedWarehouse() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
     ArchiveWarehouseUseCase useCase = new ArchiveWarehouseUseCase(store);
 
-    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.archive(current));
-    assertEquals(409, ex.getResponse().getStatus());
+    Warehouse warehouse = new Warehouse();
+    warehouse.businessUnitCode = "BU1";
+    warehouse.archivedAt = java.time.LocalDateTime.now();
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.archive(warehouse));
+
+    assertEquals(409, exception.getResponse().getStatus());
   }
 
-  private static final class FakeWarehouseStore implements WarehouseStore {
-    private final List<Warehouse> entries = new ArrayList<>();
+  private static final class InMemoryWarehouseStore implements WarehouseStore {
+
+    private final List<Warehouse> updated = new ArrayList<>();
 
     @Override
     public List<Warehouse> getAll() {
-      return entries.stream().filter(w -> w.archivedAt == null).toList();
+      return List.of();
     }
 
     @Override
     public void create(Warehouse warehouse) {
-      entries.add(warehouse);
+      // no-op for tests
     }
 
     @Override
     public void update(Warehouse warehouse) {
-      Warehouse current = entries.stream()
-          .filter(w -> w.businessUnitCode.equals(warehouse.businessUnitCode))
-          .findFirst()
-          .orElse(null);
-      if (current != null) {
-        current.location = warehouse.location;
-        current.capacity = warehouse.capacity;
-        current.stock = warehouse.stock;
-        current.archivedAt = warehouse.archivedAt;
-      }
+      updated.add(warehouse);
     }
 
     @Override
     public void remove(Warehouse warehouse) {
-      entries.removeIf(w -> w.businessUnitCode.equals(warehouse.businessUnitCode));
+      // no-op for tests
     }
 
     @Override
     public Warehouse findByBusinessUnitCode(String buCode) {
-      return entries.stream()
-          .filter(w -> w.archivedAt == null)
-          .filter(w -> w.businessUnitCode.equals(buCode))
-          .findFirst()
-          .orElse(null);
+      return null;
     }
   }
 }

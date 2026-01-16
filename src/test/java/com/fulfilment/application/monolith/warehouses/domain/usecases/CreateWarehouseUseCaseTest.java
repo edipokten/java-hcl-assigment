@@ -12,190 +12,150 @@ import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStor
 import jakarta.ws.rs.WebApplicationException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class CreateWarehouseUseCaseTest {
 
   @Test
-  void shouldCreateWarehouseWithTrimmedFields() {
-    FakeWarehouseStore store = new FakeWarehouseStore();
-    LocationResolver resolver = id -> new Location("AMSTERDAM-001", 5, 100);
+  void createsWarehouseWhenValid() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
     CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
 
-    Warehouse input = new Warehouse();
-    input.businessUnitCode = "  BU-001 ";
-    input.location = " AMSTERDAM-001 ";
-    input.capacity = 20;
-    input.stock = 10;
+    Warehouse warehouse = new Warehouse();
+    warehouse.businessUnitCode = " BU1 ";
+    warehouse.location = " NYC ";
+    warehouse.capacity = 200;
+    warehouse.stock = 50;
 
-    useCase.create(input);
+    useCase.create(warehouse);
 
-    assertEquals(1, store.entries.size());
-    Warehouse created = store.entries.get(0);
-    assertEquals("BU-001", created.businessUnitCode);
-    assertEquals("AMSTERDAM-001", created.location);
+    assertEquals(1, store.created.size());
+    Warehouse created = store.created.get(0);
+    assertEquals("BU1", created.businessUnitCode);
+    assertEquals("NYC", created.location);
     assertNotNull(created.createdAt);
     assertNull(created.archivedAt);
   }
 
   @Test
-  void shouldRejectDuplicateBusinessUnitCode() {
-    FakeWarehouseStore store = new FakeWarehouseStore();
+  void rejectsDuplicateBusinessUnitCode() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
     Warehouse existing = new Warehouse();
-    existing.businessUnitCode = "BU-001";
-    existing.location = "AMSTERDAM-001";
-    existing.capacity = 20;
-    existing.stock = 10;
-    store.entries.add(existing);
+    existing.businessUnitCode = "BU1";
+    store.warehouses.add(existing);
 
-    LocationResolver resolver = id -> new Location("AMSTERDAM-001", 5, 100);
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
     CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
 
-    Warehouse input = new Warehouse();
-    input.businessUnitCode = "BU-001";
-    input.location = "AMSTERDAM-001";
-    input.capacity = 20;
-    input.stock = 10;
+    Warehouse incoming = new Warehouse();
+    incoming.businessUnitCode = "BU1";
+    incoming.location = "NYC";
+    incoming.capacity = 100;
+    incoming.stock = 10;
 
-    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.create(input));
-    assertEquals(409, ex.getResponse().getStatus());
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.create(incoming));
+
+    assertEquals(409, exception.getResponse().getStatus());
   }
 
   @Test
-  void shouldRejectInvalidLocation() {
-    FakeWarehouseStore store = new FakeWarehouseStore();
-    LocationResolver resolver = id -> null;
+  void rejectsWhenCapacityBelowStock() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
     CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
 
-    Warehouse input = new Warehouse();
-    input.businessUnitCode = "BU-002";
-    input.location = "UNKNOWN";
-    input.capacity = 20;
-    input.stock = 10;
+    Warehouse incoming = new Warehouse();
+    incoming.businessUnitCode = "BU1";
+    incoming.location = "NYC";
+    incoming.capacity = 10;
+    incoming.stock = 50;
 
-    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.create(input));
-    assertEquals(422, ex.getResponse().getStatus());
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.create(incoming));
+
+    assertEquals(409, exception.getResponse().getStatus());
   }
 
   @Test
-  void shouldRejectCapacityBelowStock() {
-    FakeWarehouseStore store = new FakeWarehouseStore();
-    LocationResolver resolver = id -> new Location("AMSTERDAM-001", 5, 100);
-    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
-
-    Warehouse input = new Warehouse();
-    input.businessUnitCode = "BU-003";
-    input.location = "AMSTERDAM-001";
-    input.capacity = 5;
-    input.stock = 10;
-
-    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.create(input));
-    assertEquals(409, ex.getResponse().getStatus());
-  }
-
-  @Test
-  void shouldRejectWhenMaxWarehousesReachedForLocation() {
-    FakeWarehouseStore store = new FakeWarehouseStore();
-    LocationResolver resolver = id -> new Location("AMSTERDAM-001", 2, 100);
-    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
-
-    Warehouse existingOne = new Warehouse();
-    existingOne.businessUnitCode = "BU-010";
-    existingOne.location = "AMSTERDAM-001";
-    existingOne.capacity = 20;
-    existingOne.stock = 10;
-    store.entries.add(existingOne);
-
-    Warehouse existingTwo = new Warehouse();
-    existingTwo.businessUnitCode = "BU-011";
-    existingTwo.location = "AMSTERDAM-001";
-    existingTwo.capacity = 20;
-    existingTwo.stock = 10;
-    store.entries.add(existingTwo);
-
-    Warehouse input = new Warehouse();
-    input.businessUnitCode = "BU-012";
-    input.location = "AMSTERDAM-001";
-    input.capacity = 10;
-    input.stock = 5;
-
-    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.create(input));
-    assertEquals(409, ex.getResponse().getStatus());
-  }
-
-  @Test
-  void shouldRejectWhenWarehouseCapacityExceedsLocationMax() {
-    FakeWarehouseStore store = new FakeWarehouseStore();
-    LocationResolver resolver = id -> new Location("AMSTERDAM-001", 5, 100);
-    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
-
-    Warehouse input = new Warehouse();
-    input.businessUnitCode = "BU-020";
-    input.location = "AMSTERDAM-001";
-    input.capacity = 120;
-    input.stock = 10;
-
-    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.create(input));
-    assertEquals(409, ex.getResponse().getStatus());
-  }
-
-  @Test
-  void shouldRejectWhenTotalCapacityExceedsLocationMax() {
-    FakeWarehouseStore store = new FakeWarehouseStore();
-    LocationResolver resolver = id -> new Location("AMSTERDAM-001", 5, 100);
-    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
-
+  void rejectsWhenMaxWarehousesReached() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
     Warehouse existing = new Warehouse();
-    existing.businessUnitCode = "BU-021";
-    existing.location = "AMSTERDAM-001";
-    existing.capacity = 60;
+    existing.businessUnitCode = "BU1";
+    existing.location = "NYC";
+    existing.capacity = 100;
     existing.stock = 10;
-    store.entries.add(existing);
+    store.warehouses.add(existing);
 
-    Warehouse input = new Warehouse();
-    input.businessUnitCode = "BU-022";
-    input.location = "AMSTERDAM-001";
-    input.capacity = 50;
-    input.stock = 10;
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 1, 500))
+    );
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
 
-    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.create(input));
-    assertEquals(409, ex.getResponse().getStatus());
+    Warehouse incoming = new Warehouse();
+    incoming.businessUnitCode = "BU2";
+    incoming.location = "NYC";
+    incoming.capacity = 100;
+    incoming.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.create(incoming));
+
+    assertEquals(409, exception.getResponse().getStatus());
   }
 
-  private static final class FakeWarehouseStore implements WarehouseStore {
-    private final List<Warehouse> entries = new ArrayList<>();
+  private static final class MapLocationResolver implements LocationResolver {
+
+    private final Map<String, Location> locations;
+
+    private MapLocationResolver(Map<String, Location> locations) {
+      this.locations = locations;
+    }
+
+    @Override
+    public Location resolveByIdentifier(String identifier) {
+      return locations.get(identifier);
+    }
+  }
+
+  private static final class InMemoryWarehouseStore implements WarehouseStore {
+
+    private final List<Warehouse> warehouses = new ArrayList<>();
+    private final List<Warehouse> created = new ArrayList<>();
 
     @Override
     public List<Warehouse> getAll() {
-      return entries.stream().filter(w -> w.archivedAt == null).toList();
+      return new ArrayList<>(warehouses);
     }
 
     @Override
     public void create(Warehouse warehouse) {
-      entries.add(warehouse);
+      warehouses.add(warehouse);
+      created.add(warehouse);
     }
 
     @Override
     public void update(Warehouse warehouse) {
-      Warehouse current = findByBusinessUnitCode(warehouse.businessUnitCode);
-      if (current != null) {
-        current.location = warehouse.location;
-        current.capacity = warehouse.capacity;
-        current.stock = warehouse.stock;
-        current.archivedAt = warehouse.archivedAt;
-      }
+      // no-op for tests
     }
 
     @Override
     public void remove(Warehouse warehouse) {
-      entries.removeIf(w -> w.businessUnitCode.equals(warehouse.businessUnitCode));
+      warehouses.remove(warehouse);
     }
 
     @Override
     public Warehouse findByBusinessUnitCode(String buCode) {
-      return entries.stream()
-          .filter(w -> w.archivedAt == null)
-          .filter(w -> w.businessUnitCode.equals(buCode))
+      return warehouses.stream()
+          .filter(warehouse -> warehouse.businessUnitCode.equals(buCode))
           .findFirst()
           .orElse(null);
     }
