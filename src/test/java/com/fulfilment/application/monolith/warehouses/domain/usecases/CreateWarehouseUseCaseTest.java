@@ -123,6 +123,45 @@ class CreateWarehouseUseCaseTest {
     assertEquals(409, ex.getResponse().getStatus());
   }
 
+  @Test
+  void shouldRejectWhenWarehouseCapacityExceedsLocationMax() {
+    FakeWarehouseStore store = new FakeWarehouseStore();
+    LocationResolver resolver = id -> new Location("AMSTERDAM-001", 5, 100);
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse input = new Warehouse();
+    input.businessUnitCode = "BU-020";
+    input.location = "AMSTERDAM-001";
+    input.capacity = 120;
+    input.stock = 10;
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.create(input));
+    assertEquals(409, ex.getResponse().getStatus());
+  }
+
+  @Test
+  void shouldRejectWhenTotalCapacityExceedsLocationMax() {
+    FakeWarehouseStore store = new FakeWarehouseStore();
+    LocationResolver resolver = id -> new Location("AMSTERDAM-001", 5, 100);
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse existing = new Warehouse();
+    existing.businessUnitCode = "BU-021";
+    existing.location = "AMSTERDAM-001";
+    existing.capacity = 60;
+    existing.stock = 10;
+    store.entries.add(existing);
+
+    Warehouse input = new Warehouse();
+    input.businessUnitCode = "BU-022";
+    input.location = "AMSTERDAM-001";
+    input.capacity = 50;
+    input.stock = 10;
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.create(input));
+    assertEquals(409, ex.getResponse().getStatus());
+  }
+
   private static final class FakeWarehouseStore implements WarehouseStore {
     private final List<Warehouse> entries = new ArrayList<>();
 

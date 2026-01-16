@@ -124,6 +124,52 @@ class ReplaceWarehouseUseCaseTest {
     assertEquals(409, ex.getResponse().getStatus());
   }
 
+  @Test
+  void shouldRejectWhenNewCapacityBelowCurrentStock() {
+    FakeWarehouseStore store = new FakeWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU-350";
+    current.location = "AMSTERDAM-002";
+    current.capacity = 20;
+    current.stock = 15;
+    store.entries.add(current);
+
+    LocationResolver resolver = id -> new Location("AMSTERDAM-002", 3, 75);
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU-350";
+    replacement.location = "AMSTERDAM-002";
+    replacement.capacity = 10;
+    replacement.stock = 15;
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.replace(replacement));
+    assertEquals(409, ex.getResponse().getStatus());
+  }
+
+  @Test
+  void shouldRejectWhenReplacementCapacityExceedsLocationMax() {
+    FakeWarehouseStore store = new FakeWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU-360";
+    current.location = "AMSTERDAM-002";
+    current.capacity = 20;
+    current.stock = 10;
+    store.entries.add(current);
+
+    LocationResolver resolver = id -> new Location("AMSTERDAM-002", 3, 75);
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU-360";
+    replacement.location = "AMSTERDAM-002";
+    replacement.capacity = 80;
+    replacement.stock = 10;
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> useCase.replace(replacement));
+    assertEquals(409, ex.getResponse().getStatus());
+  }
+
   private static final class FakeWarehouseStore implements WarehouseStore {
     private final List<Warehouse> entries = new ArrayList<>();
 
