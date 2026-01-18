@@ -222,55 +222,6 @@ class CreateWarehouseUseCaseTest {
     assertEquals(422, stockException.getResponse().getStatus());
   }
 
-  @Test
-  void rejectsMissingRequiredFields() {
-    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
-    LocationResolver resolver = new MapLocationResolver(
-        Map.of("NYC", new Location("NYC", 3, 500))
-    );
-    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
-
-    Warehouse missingBusinessUnit = new Warehouse();
-    missingBusinessUnit.businessUnitCode = " ";
-    missingBusinessUnit.location = "NYC";
-    missingBusinessUnit.capacity = 100;
-    missingBusinessUnit.stock = 10;
-
-    WebApplicationException businessUnitException = assertThrows(WebApplicationException.class,
-        () -> useCase.create(missingBusinessUnit));
-    assertEquals(422, businessUnitException.getResponse().getStatus());
-
-    Warehouse missingLocation = new Warehouse();
-    missingLocation.businessUnitCode = "BU1";
-    missingLocation.location = " ";
-    missingLocation.capacity = 100;
-    missingLocation.stock = 10;
-
-    WebApplicationException locationException = assertThrows(WebApplicationException.class,
-        () -> useCase.create(missingLocation));
-    assertEquals(422, locationException.getResponse().getStatus());
-
-    Warehouse missingCapacity = new Warehouse();
-    missingCapacity.businessUnitCode = "BU1";
-    missingCapacity.location = "NYC";
-    missingCapacity.capacity = null;
-    missingCapacity.stock = 10;
-
-    WebApplicationException capacityException = assertThrows(WebApplicationException.class,
-        () -> useCase.create(missingCapacity));
-    assertEquals(422, capacityException.getResponse().getStatus());
-
-    Warehouse missingStock = new Warehouse();
-    missingStock.businessUnitCode = "BU1";
-    missingStock.location = "NYC";
-    missingStock.capacity = 100;
-    missingStock.stock = null;
-
-    WebApplicationException stockException = assertThrows(WebApplicationException.class,
-        () -> useCase.create(missingStock));
-    assertEquals(422, stockException.getResponse().getStatus());
-  }
-
   private static final class MapLocationResolver implements LocationResolver {
 
     private final Map<String, Location> locations;
