@@ -75,6 +75,41 @@ class ReplaceWarehouseUseCaseTest {
   }
 
   @Test
+  void replacesWhenCurrentCapacityIsNull() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = null;
+    current.stock = 10;
+    store.warehouses.add(current);
+
+    Warehouse other = new Warehouse();
+    other.businessUnitCode = "BU2";
+    other.location = "LOC1";
+    other.capacity = 20;
+    other.stock = 5;
+    store.warehouses.add(other);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("LOC1", new Location("LOC1", 5, 100))
+    );
+
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU1";
+    replacement.location = "LOC1";
+    replacement.capacity = 30;
+    replacement.stock = 10;
+
+    useCase.replace(replacement);
+
+    assertEquals(1, store.updated.size());
+    assertEquals(1, store.created.size());
+  }
+
+  @Test
   void rejectsWhenMovingToFullLocation() {
     InMemoryWarehouseStore store = new InMemoryWarehouseStore();
     Warehouse current = new Warehouse();
@@ -103,6 +138,34 @@ class ReplaceWarehouseUseCaseTest {
     Warehouse replacement = new Warehouse();
     replacement.businessUnitCode = "BU1";
     replacement.location = "LOC2";
+    replacement.capacity = 120;
+    replacement.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(replacement));
+
+    assertEquals(409, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsWhenStockWasNotPreviouslySet() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = 100;
+    current.stock = null;
+    store.warehouses.add(current);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("LOC1", new Location("LOC1", 5, 500))
+    );
+
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU1";
+    replacement.location = "LOC1";
     replacement.capacity = 120;
     replacement.stock = 10;
 
@@ -290,6 +353,34 @@ class ReplaceWarehouseUseCaseTest {
     WebApplicationException stockException = assertThrows(WebApplicationException.class,
         () -> useCase.replace(invalidStock));
     assertEquals(422, stockException.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsMissingBusinessUnitCode() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = 100;
+    current.stock = 10;
+    store.warehouses.add(current);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("LOC1", new Location("LOC1", 5, 500))
+    );
+
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = " ";
+    replacement.location = "LOC1";
+    replacement.capacity = 120;
+    replacement.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(replacement));
+
+    assertEquals(422, exception.getResponse().getStatus());
   }
 
   private static final class MapLocationResolver implements LocationResolver {

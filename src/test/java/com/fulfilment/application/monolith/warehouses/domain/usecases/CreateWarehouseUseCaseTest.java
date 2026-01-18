@@ -127,6 +127,53 @@ class CreateWarehouseUseCaseTest {
   }
 
   @Test
+  void rejectsMissingRequiredFields() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse missingBusinessUnitCode = new Warehouse();
+    missingBusinessUnitCode.businessUnitCode = " ";
+    missingBusinessUnitCode.location = "NYC";
+    missingBusinessUnitCode.capacity = 10;
+    missingBusinessUnitCode.stock = 1;
+
+    WebApplicationException buException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(missingBusinessUnitCode));
+    assertEquals(422, buException.getResponse().getStatus());
+
+    Warehouse missingLocation = new Warehouse();
+    missingLocation.businessUnitCode = "BU1";
+    missingLocation.location = " ";
+    missingLocation.capacity = 10;
+    missingLocation.stock = 1;
+
+    WebApplicationException locationException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(missingLocation));
+    assertEquals(422, locationException.getResponse().getStatus());
+
+    Warehouse missingCapacity = new Warehouse();
+    missingCapacity.businessUnitCode = "BU2";
+    missingCapacity.location = "NYC";
+    missingCapacity.stock = 1;
+
+    WebApplicationException capacityException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(missingCapacity));
+    assertEquals(422, capacityException.getResponse().getStatus());
+
+    Warehouse missingStock = new Warehouse();
+    missingStock.businessUnitCode = "BU3";
+    missingStock.location = "NYC";
+    missingStock.capacity = 10;
+
+    WebApplicationException stockException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(missingStock));
+    assertEquals(422, stockException.getResponse().getStatus());
+  }
+
+  @Test
   void rejectsInvalidLocation() {
     InMemoryWarehouseStore store = new InMemoryWarehouseStore();
     LocationResolver resolver = new MapLocationResolver(
@@ -144,6 +191,33 @@ class CreateWarehouseUseCaseTest {
         () -> useCase.create(incoming));
 
     assertEquals(422, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void createsWhenExistingCapacityIsNull() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse existing = new Warehouse();
+    existing.businessUnitCode = "BU1";
+    existing.location = "NYC";
+    existing.capacity = null;
+    existing.stock = 10;
+    store.warehouses.add(existing);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse incoming = new Warehouse();
+    incoming.businessUnitCode = "BU2";
+    incoming.location = "NYC";
+    incoming.capacity = 100;
+    incoming.stock = 10;
+
+    useCase.create(incoming);
+
+    assertEquals(1, store.created.size());
+    assertEquals("BU2", store.created.get(0).businessUnitCode);
   }
 
   @Test
