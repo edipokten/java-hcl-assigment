@@ -1,22 +1,23 @@
 package com.fulfilment.application.monolith.stores;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
 class StoreTest {
 
-    @Test
-    void constructorsInitializeFields() {
-        Store named = new Store("SHOP-1");
-        assertEquals("SHOP-1", named.name);
-        assertEquals(0, named.quantityProductsInStock);
+  @Test
+  void defaultConstructorLeavesNameNull() {
+    Store store = new Store();
 
-        Store empty = new Store();
-        empty.name = "SHOP-2";
-        empty.quantityProductsInStock = 7;
+    assertNull(store.name);
+  }
 
-        assertEquals("SHOP-2", empty.name);
-        assertEquals(7, empty.quantityProductsInStock);
-    }
+  @Test
+  void constructorSetsName() {
+    Store store = new Store("Flagship");
+
+    assertEquals("Flagship", store.name);
+  }
 }

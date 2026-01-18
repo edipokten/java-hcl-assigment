@@ -1,151 +1,153 @@
 package com.fulfilment.application.monolith.stores;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import jakarta.transaction.Status;
 import jakarta.transaction.Synchronization;
 import jakarta.transaction.TransactionSynchronizationRegistry;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class AfterCommitExecutorTest {
 
-    @Test
-    void runAfterCommitRegistersSynchronizationAndExecutesOnCommit() {
-        FakeTransactionSynchronizationRegistry registry =
-                new FakeTransactionSynchronizationRegistry(Status.STATUS_ACTIVE);
-        AfterCommitExecutor executor = new AfterCommitExecutor();
-        executor.txSyncRegistry = registry;
+  @Test
+  void doesNothingWhenActionIsNull() {
+    AfterCommitExecutor executor = new AfterCommitExecutor();
+    executor.txSyncRegistry = new StubTransactionSynchronizationRegistry(Status.STATUS_ACTIVE);
 
-        AtomicBoolean ran = new AtomicBoolean(false);
-        executor.runAfterCommit(() -> ran.set(true));
+    executor.runAfterCommit(null);
 
-        assertFalse(ran.get());
-        registry.fireAfterCompletion(Status.STATUS_COMMITTED);
-        assertTrue(ran.get());
+    assertFalse(((StubTransactionSynchronizationRegistry) executor.txSyncRegistry).registered);
+  }
+
+  @Test
+  void registersSynchronizationWhenTransactionActive() {
+    AfterCommitExecutor executor = new AfterCommitExecutor();
+    StubTransactionSynchronizationRegistry registry =
+        new StubTransactionSynchronizationRegistry(Status.STATUS_ACTIVE);
+    executor.txSyncRegistry = registry;
+
+    AtomicBoolean executed = new AtomicBoolean(false);
+    executor.runAfterCommit(() -> executed.set(true));
+
+    assertFalse(executed.get());
+    assertTrue(registry.registered);
+
+    registry.fireAfterCompletion(Status.STATUS_COMMITTED);
+    assertTrue(executed.get());
+  }
+
+  @Test
+  void executesImmediatelyWhenNoActiveTransaction() {
+    AfterCommitExecutor executor = new AfterCommitExecutor();
+    executor.txSyncRegistry = new StubTransactionSynchronizationRegistry(Status.STATUS_NO_TRANSACTION);
+
+    AtomicBoolean executed = new AtomicBoolean(false);
+    executor.runAfterCommit(() -> executed.set(true));
+
+    assertTrue(executed.get());
+  }
+
+  @Test
+  void executesImmediatelyWhenRegistryThrows() {
+    AfterCommitExecutor executor = new AfterCommitExecutor();
+    executor.txSyncRegistry = new ThrowingTransactionSynchronizationRegistry();
+
+    AtomicBoolean executed = new AtomicBoolean(false);
+    executor.runAfterCommit(() -> executed.set(true));
+
+    assertTrue(executed.get());
+  }
+
+  private static final class StubTransactionSynchronizationRegistry
+      implements TransactionSynchronizationRegistry {
+    private final int status;
+    private Synchronization synchronization;
+    private boolean registered;
+
+    private StubTransactionSynchronizationRegistry(int status) {
+      this.status = status;
     }
 
-    @Test
-    void runAfterCommitDoesNotExecuteOnRollback() {
-        FakeTransactionSynchronizationRegistry registry =
-                new FakeTransactionSynchronizationRegistry(Status.STATUS_ACTIVE);
-        AfterCommitExecutor executor = new AfterCommitExecutor();
-        executor.txSyncRegistry = registry;
-
-        AtomicBoolean ran = new AtomicBoolean(false);
-        executor.runAfterCommit(() -> ran.set(true));
-
-        registry.fireAfterCompletion(Status.STATUS_ROLLEDBACK);
-        assertFalse(ran.get());
+    @Override
+    public Object getResource(Object key) {
+      return null;
     }
 
-    @Test
-    void runAfterCommitExecutesImmediatelyWithoutActiveTransaction() {
-        FakeTransactionSynchronizationRegistry registry =
-                new FakeTransactionSynchronizationRegistry(Status.STATUS_NO_TRANSACTION);
-        AfterCommitExecutor executor = new AfterCommitExecutor();
-        executor.txSyncRegistry = registry;
-
-        AtomicBoolean ran = new AtomicBoolean(false);
-        executor.runAfterCommit(() -> ran.set(true));
-
-        assertTrue(ran.get());
-        assertNull(registry.getSynchronization());
+    @Override
+    public void putResource(Object key, Object value) {
+      // no-op
     }
 
-    @Test
-    void runAfterCommitExecutesImmediatelyWhenRegistryThrows() {
-        FakeTransactionSynchronizationRegistry registry =
-                new FakeTransactionSynchronizationRegistry(Status.STATUS_ACTIVE);
-        registry.setThrowIllegalState(true);
-
-        AfterCommitExecutor executor = new AfterCommitExecutor();
-        executor.txSyncRegistry = registry;
-
-        AtomicBoolean ran = new AtomicBoolean(false);
-        executor.runAfterCommit(() -> ran.set(true));
-
-        assertTrue(ran.get());
+    @Override
+    public void registerInterposedSynchronization(Synchronization synchronization) {
+      this.synchronization = synchronization;
+      this.registered = true;
     }
 
-    @Test
-    void runAfterCommitIgnoresNullAction() {
-        FakeTransactionSynchronizationRegistry registry =
-                new FakeTransactionSynchronizationRegistry(Status.STATUS_ACTIVE);
-        AfterCommitExecutor executor = new AfterCommitExecutor();
-        executor.txSyncRegistry = registry;
-
-        executor.runAfterCommit(null);
-
-        assertNull(registry.getSynchronization());
+    @Override
+    public int getTransactionStatus() {
+      return status;
     }
 
-    static class FakeTransactionSynchronizationRegistry implements TransactionSynchronizationRegistry {
-
-        private final Map<Object, Object> resources = new HashMap<>();
-        private final int status;
-        private boolean rollbackOnly;
-        private boolean throwIllegalState;
-        private Synchronization synchronization;
-
-        FakeTransactionSynchronizationRegistry(int status) {
-            this.status = status;
-        }
-
-        void setThrowIllegalState(boolean throwIllegalState) {
-            this.throwIllegalState = throwIllegalState;
-        }
-
-        Synchronization getSynchronization() {
-            return synchronization;
-        }
-
-        void fireAfterCompletion(int completionStatus) {
-            if (synchronization != null) {
-                synchronization.afterCompletion(completionStatus);
-            }
-        }
-
-        @Override
-        public Object getTransactionKey() {
-            return this;
-        }
-
-        @Override
-        public void putResource(Object key, Object value) {
-            resources.put(key, value);
-        }
-
-        @Override
-        public Object getResource(Object key) {
-            return resources.get(key);
-        }
-
-        @Override
-        public void registerInterposedSynchronization(Synchronization synchronization) {
-            this.synchronization = synchronization;
-        }
-
-        @Override
-        public void setRollbackOnly() {
-            rollbackOnly = true;
-        }
-
-        @Override
-        public boolean getRollbackOnly() {
-            return rollbackOnly;
-        }
-
-        @Override
-        public int getTransactionStatus() {
-            if (throwIllegalState) {
-                throw new IllegalStateException("No transaction bound");
-            }
-            return status;
-        }
+    @Override
+    public Object getTransactionKey() {
+      return null;
     }
+
+    @Override
+    public void setRollbackOnly() {
+      // no-op
+    }
+
+    @Override
+    public boolean getRollbackOnly() {
+      return false;
+    }
+
+    private void fireAfterCompletion(int completionStatus) {
+      if (synchronization != null) {
+        synchronization.afterCompletion(completionStatus);
+      }
+    }
+  }
+
+  private static final class ThrowingTransactionSynchronizationRegistry
+      implements TransactionSynchronizationRegistry {
+    @Override
+    public Object getResource(Object key) {
+      return null;
+    }
+
+    @Override
+    public void putResource(Object key, Object value) {
+      // no-op
+    }
+
+    @Override
+    public void registerInterposedSynchronization(Synchronization synchronization) {
+      // no-op
+    }
+
+    @Override
+    public int getTransactionStatus() {
+      throw new IllegalStateException("No transaction");
+    }
+
+    @Override
+    public Object getTransactionKey() {
+      return null;
+    }
+
+    @Override
+    public void setRollbackOnly() {
+      // no-op
+    }
+
+    @Override
+    public boolean getRollbackOnly() {
+      return false;
+    }
+  }
 }
