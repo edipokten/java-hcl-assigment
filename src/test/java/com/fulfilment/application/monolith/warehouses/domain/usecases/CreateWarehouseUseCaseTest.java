@@ -343,5 +343,10 @@ class CreateWarehouseUseCaseTest {
           .findFirst()
           .orElse(null);
     }
+
+    @Override
+    public Warehouse findAnyByBusinessUnitCode(String buCode) {
+      return findByBusinessUnitCode(buCode);
+    }
   }
 }

@@ -81,5 +81,10 @@ class ArchiveWarehouseUseCaseTest {
     public Warehouse findByBusinessUnitCode(String buCode) {
       return null;
     }
+
+    @Override
+    public Warehouse findAnyByBusinessUnitCode(String buCode) {
+      return null;
+    }
   }
 }
