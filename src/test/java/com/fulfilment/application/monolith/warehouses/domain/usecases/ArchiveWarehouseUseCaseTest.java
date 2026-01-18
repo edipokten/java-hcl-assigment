@@ -7,48 +7,55 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
 import jakarta.ws.rs.WebApplicationException;
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ArchiveWarehouseUseCaseTest {
 
   @Test
-  void rejectsNullWarehouse() {
-    ArchiveWarehouseUseCase useCase = new ArchiveWarehouseUseCase(new StubStore());
+  void archivesWarehouse() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    ArchiveWarehouseUseCase useCase = new ArchiveWarehouseUseCase(store);
 
-    WebApplicationException ex =
-        assertThrows(WebApplicationException.class, () -> useCase.archive(null));
+    Warehouse warehouse = new Warehouse();
+    warehouse.businessUnitCode = "BU1";
 
-    assertEquals(422, ex.getResponse().getStatus());
+    useCase.archive(warehouse);
+
+    assertEquals(1, store.updated.size());
+    assertNotNull(store.updated.get(0).archivedAt);
   }
 
   @Test
   void rejectsAlreadyArchivedWarehouse() {
-    ArchiveWarehouseUseCase useCase = new ArchiveWarehouseUseCase(new StubStore());
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    ArchiveWarehouseUseCase useCase = new ArchiveWarehouseUseCase(store);
+
     Warehouse warehouse = new Warehouse();
-    warehouse.archivedAt = LocalDateTime.now();
+    warehouse.businessUnitCode = "BU1";
+    warehouse.archivedAt = java.time.LocalDateTime.now();
 
-    WebApplicationException ex =
-        assertThrows(WebApplicationException.class, () -> useCase.archive(warehouse));
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.archive(warehouse));
 
-    assertEquals(409, ex.getResponse().getStatus());
+    assertEquals(409, exception.getResponse().getStatus());
   }
 
   @Test
-  void archivesWarehouse() {
-    StubStore store = new StubStore();
+  void rejectsMissingWarehouse() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
     ArchiveWarehouseUseCase useCase = new ArchiveWarehouseUseCase(store);
-    Warehouse warehouse = new Warehouse();
 
-    useCase.archive(warehouse);
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.archive(null));
 
-    assertNotNull(warehouse.archivedAt);
-    assertEquals(warehouse, store.updated);
+    assertEquals(422, exception.getResponse().getStatus());
   }
 
-  private static final class StubStore implements WarehouseStore {
-    private Warehouse updated;
+  private static final class InMemoryWarehouseStore implements WarehouseStore {
+
+    private final List<Warehouse> updated = new ArrayList<>();
 
     @Override
     public List<Warehouse> getAll() {
@@ -57,17 +64,17 @@ class ArchiveWarehouseUseCaseTest {
 
     @Override
     public void create(Warehouse warehouse) {
-      // no-op
+      // no-op for tests
     }
 
     @Override
     public void update(Warehouse warehouse) {
-      this.updated = warehouse;
+      updated.add(warehouse);
     }
 
     @Override
     public void remove(Warehouse warehouse) {
-      // no-op
+      // no-op for tests
     }
 
     @Override

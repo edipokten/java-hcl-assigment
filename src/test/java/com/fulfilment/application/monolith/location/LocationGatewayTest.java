@@ -1,34 +1,58 @@
 package com.fulfilment.application.monolith.location;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 import com.fulfilment.application.monolith.warehouses.domain.models.Location;
 import org.junit.jupiter.api.Test;
 
-class LocationGatewayTest {
+public class LocationGatewayTest {
 
   @Test
-  void returnsNullWhenIdentifierMissing() {
-    LocationGateway gateway = new LocationGateway();
+  void testWhenResolveExistingLocationShouldReturn() {
+    // given
+    LocationGateway locationGateway = new LocationGateway();
 
-    assertNull(gateway.resolveByIdentifier(null));
-    assertNull(gateway.resolveByIdentifier(" "));
-  }
+    // when
+    Location location = locationGateway.resolveByIdentifier("ZWOLLE-001");
 
-  @Test
-  void resolvesKnownLocation() {
-    LocationGateway gateway = new LocationGateway();
-
-    Location location = gateway.resolveByIdentifier("  ZWOLLE-001  ");
-
+    // then
+    assertNotNull(location);
     assertEquals("ZWOLLE-001", location.identification);
   }
 
   @Test
-  void returnsNullWhenUnknownLocation() {
-    LocationGateway gateway = new LocationGateway();
+  void testWhenResolveUnknownLocationShouldReturnNull() {
+    // given
+    LocationGateway locationGateway = new LocationGateway();
 
-    assertNull(gateway.resolveByIdentifier("UNKNOWN"));
+    // when
+    Location location = locationGateway.resolveByIdentifier("UNKNOWN-999");
+
+    // then
+    assertNull(location);
+  }
+
+  @Test
+  void testWhenResolveNullOrBlankIdentifierShouldReturnNull() {
+    // given
+    LocationGateway locationGateway = new LocationGateway();
+
+    // then
+    assertNull(locationGateway.resolveByIdentifier(null));
+    assertNull(locationGateway.resolveByIdentifier(""));
+    assertNull(locationGateway.resolveByIdentifier("   "));
+  }
+
+  @Test
+  void testWhenResolveIdentifierWithWhitespaceShouldStillResolve() {
+    // given
+    LocationGateway locationGateway = new LocationGateway();
+
+    // when
+    Location location = locationGateway.resolveByIdentifier("  AMSTERDAM-001  ");
+
+    // then
+    assertNotNull(location);
+    assertEquals("AMSTERDAM-001", location.identification);
   }
 }
