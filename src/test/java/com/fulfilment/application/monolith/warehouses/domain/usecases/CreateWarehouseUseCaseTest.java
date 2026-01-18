@@ -112,6 +112,165 @@ class CreateWarehouseUseCaseTest {
     assertEquals(409, exception.getResponse().getStatus());
   }
 
+  @Test
+  void rejectsMissingRequestBody() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.create(null));
+
+    assertEquals(422, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsInvalidLocation() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse incoming = new Warehouse();
+    incoming.businessUnitCode = "BU1";
+    incoming.location = "MISSING";
+    incoming.capacity = 100;
+    incoming.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.create(incoming));
+
+    assertEquals(422, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsCapacityExceedingLocationLimit() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 100))
+    );
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse incoming = new Warehouse();
+    incoming.businessUnitCode = "BU1";
+    incoming.location = "NYC";
+    incoming.capacity = 150;
+    incoming.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.create(incoming));
+
+    assertEquals(409, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsWhenTotalCapacityWouldExceedLocation() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse existing = new Warehouse();
+    existing.businessUnitCode = "BU1";
+    existing.location = "NYC";
+    existing.capacity = 450;
+    existing.stock = 10;
+    store.warehouses.add(existing);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse incoming = new Warehouse();
+    incoming.businessUnitCode = "BU2";
+    incoming.location = "NYC";
+    incoming.capacity = 100;
+    incoming.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.create(incoming));
+
+    assertEquals(409, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsInvalidCapacityOrStockValues() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse invalidCapacity = new Warehouse();
+    invalidCapacity.businessUnitCode = "BU1";
+    invalidCapacity.location = "NYC";
+    invalidCapacity.capacity = 0;
+    invalidCapacity.stock = 10;
+
+    WebApplicationException capacityException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(invalidCapacity));
+    assertEquals(422, capacityException.getResponse().getStatus());
+
+    Warehouse invalidStock = new Warehouse();
+    invalidStock.businessUnitCode = "BU2";
+    invalidStock.location = "NYC";
+    invalidStock.capacity = 10;
+    invalidStock.stock = -1;
+
+    WebApplicationException stockException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(invalidStock));
+    assertEquals(422, stockException.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsMissingRequiredFields() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("NYC", new Location("NYC", 3, 500))
+    );
+    CreateWarehouseUseCase useCase = new CreateWarehouseUseCase(store, resolver);
+
+    Warehouse missingBusinessUnit = new Warehouse();
+    missingBusinessUnit.businessUnitCode = " ";
+    missingBusinessUnit.location = "NYC";
+    missingBusinessUnit.capacity = 100;
+    missingBusinessUnit.stock = 10;
+
+    WebApplicationException businessUnitException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(missingBusinessUnit));
+    assertEquals(422, businessUnitException.getResponse().getStatus());
+
+    Warehouse missingLocation = new Warehouse();
+    missingLocation.businessUnitCode = "BU1";
+    missingLocation.location = " ";
+    missingLocation.capacity = 100;
+    missingLocation.stock = 10;
+
+    WebApplicationException locationException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(missingLocation));
+    assertEquals(422, locationException.getResponse().getStatus());
+
+    Warehouse missingCapacity = new Warehouse();
+    missingCapacity.businessUnitCode = "BU1";
+    missingCapacity.location = "NYC";
+    missingCapacity.capacity = null;
+    missingCapacity.stock = 10;
+
+    WebApplicationException capacityException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(missingCapacity));
+    assertEquals(422, capacityException.getResponse().getStatus());
+
+    Warehouse missingStock = new Warehouse();
+    missingStock.businessUnitCode = "BU1";
+    missingStock.location = "NYC";
+    missingStock.capacity = 100;
+    missingStock.stock = null;
+
+    WebApplicationException stockException = assertThrows(WebApplicationException.class,
+        () -> useCase.create(missingStock));
+    assertEquals(422, stockException.getResponse().getStatus());
+  }
+
   private static final class MapLocationResolver implements LocationResolver {
 
     private final Map<String, Location> locations;

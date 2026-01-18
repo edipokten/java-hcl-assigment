@@ -42,6 +42,17 @@ class ArchiveWarehouseUseCaseTest {
     assertEquals(409, exception.getResponse().getStatus());
   }
 
+  @Test
+  void rejectsMissingWarehouse() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    ArchiveWarehouseUseCase useCase = new ArchiveWarehouseUseCase(store);
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.archive(null));
+
+    assertEquals(422, exception.getResponse().getStatus());
+  }
+
   private static final class InMemoryWarehouseStore implements WarehouseStore {
 
     private final List<Warehouse> updated = new ArrayList<>();

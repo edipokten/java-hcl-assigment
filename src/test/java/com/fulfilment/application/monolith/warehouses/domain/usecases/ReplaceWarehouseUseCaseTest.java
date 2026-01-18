@@ -140,6 +140,253 @@ class ReplaceWarehouseUseCaseTest {
     assertEquals(409, exception.getResponse().getStatus());
   }
 
+  @Test
+  void rejectsWhenLocationDoesNotExist() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = 100;
+    current.stock = 10;
+    store.warehouses.add(current);
+
+    LocationResolver resolver = new MapLocationResolver(Map.of());
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU1";
+    replacement.location = "MISSING";
+    replacement.capacity = 120;
+    replacement.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(replacement));
+
+    assertEquals(422, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsWhenNewCapacityBelowCurrentStock() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = 100;
+    current.stock = 25;
+    store.warehouses.add(current);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("LOC1", new Location("LOC1", 5, 500))
+    );
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU1";
+    replacement.location = "LOC1";
+    replacement.capacity = 20;
+    replacement.stock = 25;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(replacement));
+
+    assertEquals(409, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsWhenCapacityExceedsLocationMaximum() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = 100;
+    current.stock = 10;
+    store.warehouses.add(current);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("LOC1", new Location("LOC1", 5, 150))
+    );
+
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU1";
+    replacement.location = "LOC1";
+    replacement.capacity = 200;
+    replacement.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(replacement));
+
+    assertEquals(409, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsWhenResultingCapacityExceedsLocationLimit() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = 100;
+    current.stock = 10;
+    store.warehouses.add(current);
+
+    Warehouse other = new Warehouse();
+    other.businessUnitCode = "BU2";
+    other.location = "LOC1";
+    other.capacity = 350;
+    other.stock = 10;
+    store.warehouses.add(other);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("LOC1", new Location("LOC1", 5, 400))
+    );
+
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU1";
+    replacement.location = "LOC1";
+    replacement.capacity = 150;
+    replacement.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(replacement));
+
+    assertEquals(409, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsInvalidCapacityOrStockValues() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = 100;
+    current.stock = 10;
+    store.warehouses.add(current);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("LOC1", new Location("LOC1", 5, 500))
+    );
+
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse invalidCapacity = new Warehouse();
+    invalidCapacity.businessUnitCode = "BU1";
+    invalidCapacity.location = "LOC1";
+    invalidCapacity.capacity = 0;
+    invalidCapacity.stock = 10;
+
+    WebApplicationException capacityException = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(invalidCapacity));
+    assertEquals(422, capacityException.getResponse().getStatus());
+
+    Warehouse invalidStock = new Warehouse();
+    invalidStock.businessUnitCode = "BU1";
+    invalidStock.location = "LOC1";
+    invalidStock.capacity = 10;
+    invalidStock.stock = -1;
+
+    WebApplicationException stockException = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(invalidStock));
+    assertEquals(422, stockException.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsWhenMovingLocationCapacityWouldOverflow() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = 100;
+    current.stock = 10;
+    store.warehouses.add(current);
+
+    Warehouse existingAtTarget = new Warehouse();
+    existingAtTarget.businessUnitCode = "BU2";
+    existingAtTarget.location = "LOC2";
+    existingAtTarget.capacity = 350;
+    existingAtTarget.stock = 10;
+    store.warehouses.add(existingAtTarget);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of(
+            "LOC1", new Location("LOC1", 5, 500),
+            "LOC2", new Location("LOC2", 5, 400)
+        )
+    );
+
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse replacement = new Warehouse();
+    replacement.businessUnitCode = "BU1";
+    replacement.location = "LOC2";
+    replacement.capacity = 100;
+    replacement.stock = 10;
+
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(replacement));
+
+    assertEquals(409, exception.getResponse().getStatus());
+  }
+
+  @Test
+  void rejectsMissingRequiredFields() {
+    InMemoryWarehouseStore store = new InMemoryWarehouseStore();
+    Warehouse current = new Warehouse();
+    current.businessUnitCode = "BU1";
+    current.location = "LOC1";
+    current.capacity = 100;
+    current.stock = 10;
+    store.warehouses.add(current);
+
+    LocationResolver resolver = new MapLocationResolver(
+        Map.of("LOC1", new Location("LOC1", 5, 500))
+    );
+
+    ReplaceWarehouseUseCase useCase = new ReplaceWarehouseUseCase(store, resolver);
+
+    Warehouse missingBusinessUnit = new Warehouse();
+    missingBusinessUnit.businessUnitCode = " ";
+    missingBusinessUnit.location = "LOC1";
+    missingBusinessUnit.capacity = 100;
+    missingBusinessUnit.stock = 10;
+
+    WebApplicationException businessUnitException = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(missingBusinessUnit));
+    assertEquals(422, businessUnitException.getResponse().getStatus());
+
+    Warehouse missingLocation = new Warehouse();
+    missingLocation.businessUnitCode = "BU1";
+    missingLocation.location = " ";
+    missingLocation.capacity = 100;
+    missingLocation.stock = 10;
+
+    WebApplicationException locationException = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(missingLocation));
+    assertEquals(422, locationException.getResponse().getStatus());
+
+    Warehouse missingCapacity = new Warehouse();
+    missingCapacity.businessUnitCode = "BU1";
+    missingCapacity.location = "LOC1";
+    missingCapacity.capacity = null;
+    missingCapacity.stock = 10;
+
+    WebApplicationException capacityException = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(missingCapacity));
+    assertEquals(422, capacityException.getResponse().getStatus());
+
+    Warehouse missingStock = new Warehouse();
+    missingStock.businessUnitCode = "BU1";
+    missingStock.location = "LOC1";
+    missingStock.capacity = 100;
+    missingStock.stock = null;
+
+    WebApplicationException stockException = assertThrows(WebApplicationException.class,
+        () -> useCase.replace(missingStock));
+    assertEquals(422, stockException.getResponse().getStatus());
+  }
+
   private static final class MapLocationResolver implements LocationResolver {
 
     private final Map<String, Location> locations;
