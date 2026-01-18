@@ -131,11 +131,6 @@ class AfterCommitExecutorTest {
         }
 
         @Override
-        public void registerSynchronization(Synchronization synchronization) {
-            this.synchronization = synchronization;
-        }
-
-        @Override
         public void setRollbackOnly() {
             rollbackOnly = true;
         }
