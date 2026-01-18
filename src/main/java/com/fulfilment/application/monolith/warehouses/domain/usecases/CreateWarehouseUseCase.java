@@ -29,7 +29,7 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
     warehouse.location = warehouse.location.trim();
 
     // Business Unit Code must be unique
-    Warehouse existing = warehouseStore.findByBusinessUnitCode(warehouse.businessUnitCode);
+    Warehouse existing = warehouseStore.findAnyByBusinessUnitCode(warehouse.businessUnitCode);
     if (existing != null) {
       throw new WebApplicationException(
               "Warehouse businessUnitCode already exists: " + warehouse.businessUnitCode, 409);

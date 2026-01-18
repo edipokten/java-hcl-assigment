@@ -77,6 +77,16 @@ public class WarehouseRepository implements WarehouseStore, PanacheRepository<Db
     return entity == null ? null : entity.toWarehouse();
   }
 
+  @Override
+  public Warehouse findAnyByBusinessUnitCode(String buCode) {
+    if (buCode == null || buCode.isBlank()) {
+      return null;
+    }
+
+    DbWarehouse entity = this.find("businessUnitCode = ?1", buCode.trim()).firstResult();
+    return entity == null ? null : entity.toWarehouse();
+  }
+
   public DbWarehouse findActiveDbByBusinessUnitCode(String buCode) {
     if (buCode == null || buCode.isBlank()) {
       return null;

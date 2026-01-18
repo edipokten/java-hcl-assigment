@@ -547,5 +547,10 @@ class ReplaceWarehouseUseCaseTest {
           .findFirst()
           .orElse(null);
     }
+
+    @Override
+    public Warehouse findAnyByBusinessUnitCode(String buCode) {
+      return findByBusinessUnitCode(buCode);
+    }
   }
 }
