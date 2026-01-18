@@ -1,21 +1,23 @@
 package com.fulfilment.application.monolith.products;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
 class ProductTest {
 
   @Test
-  void constructorsInitializeFields() {
-    Product named = new Product("CHAIR");
-    assertEquals("CHAIR", named.name);
+  void defaultConstructorLeavesNameNull() {
+    Product product = new Product();
 
-    Product empty = new Product();
-    empty.name = "TABLE";
-    empty.stock = 5;
+    assertNull(product.name);
+  }
 
-    assertEquals("TABLE", empty.name);
-    assertEquals(5, empty.stock);
+  @Test
+  void constructorSetsName() {
+    Product product = new Product("Desk");
+
+    assertEquals("Desk", product.name);
   }
 }
