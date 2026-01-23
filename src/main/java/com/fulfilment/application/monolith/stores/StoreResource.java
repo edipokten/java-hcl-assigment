@@ -127,7 +127,11 @@ public class StoreResource {
     if (entity == null) {
       throw new WebApplicationException("Store with id of " + id + " does not exist.", 404);
     }
+    Store snapshot = snapshotOf(entity);
     entity.delete();
+
+    afterCommitExecutor.runAfterCommit(
+        () -> legacyStoreManagerGateway.updateStoreOnLegacySystem(snapshot));
     return Response.status(204).build();
   }
 
