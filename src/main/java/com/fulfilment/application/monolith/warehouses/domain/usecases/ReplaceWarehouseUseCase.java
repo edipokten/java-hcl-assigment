@@ -9,8 +9,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.WebApplicationException;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
-
 
 @ApplicationScoped
 public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
@@ -25,11 +23,10 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
 
   @Override
   public void replace(Warehouse newWarehouse) {
-    validateRequiredFields(newWarehouse);
+    WarehouseUseCaseSupport.validateRequiredFields(newWarehouse);
 
     // normalize
-    newWarehouse.businessUnitCode = newWarehouse.businessUnitCode.trim();
-    newWarehouse.location = newWarehouse.location.trim();
+    WarehouseUseCaseSupport.normalizeWarehouse(newWarehouse);
 
     Warehouse current = warehouseStore.findByBusinessUnitCode(newWarehouse.businessUnitCode);
     if (current == null) {
@@ -38,10 +35,7 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
     }
 
     // Location must exist
-    Location targetLocation = locationResolver.resolveByIdentifier(newWarehouse.location);
-    if (targetLocation == null) {
-      throw new WebApplicationException("Invalid warehouse location: " + newWarehouse.location, 422);
-    }
+    Location targetLocation = WarehouseUseCaseSupport.requireLocation(locationResolver, newWarehouse);
 
     // --- replacement validations ---
     // Null-safe stock/capacity comparisons
@@ -61,25 +55,18 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
     boolean movingLocation = !newWarehouse.location.equals(current.location);
 
     long countAtTarget =
-            activeWarehouses.stream().filter(w -> newWarehouse.location.equals(w.location)).count();
+            WarehouseUseCaseSupport.countActiveAtLocation(activeWarehouses, newWarehouse.location);
 
     if (movingLocation && countAtTarget >= targetLocation.maxNumberOfWarehouses) {
       throw new WebApplicationException(
               "Max number of warehouses reached for location: " + newWarehouse.location, 409);
     }
 
-    int sumCapacityAtTarget =
-            activeWarehouses.stream()
-                    .filter(w -> newWarehouse.location.equals(w.location))
-                    .map(w -> w.capacity)
-                    .filter(Objects::nonNull)
-                    .mapToInt(Integer::intValue)
-                    .sum();
-
     // ensure a single warehouse can't exceed the location cap
-    if (newWarehouse.capacity > targetLocation.maxCapacity) {
-      throw new WebApplicationException("Warehouse capacity cannot exceed location max capacity.", 409);
-    }
+    WarehouseUseCaseSupport.validateCapacityNotExceedingLocation(newWarehouse, targetLocation);
+
+    int sumCapacityAtTarget =
+            WarehouseUseCaseSupport.sumCapacityAtLocation(activeWarehouses, newWarehouse.location);
 
     int resultingCapacityAtTarget;
     if (movingLocation) {
@@ -110,29 +97,4 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
 
     warehouseStore.create(created);
   }
-
-  private void validateRequiredFields(Warehouse warehouse) {
-    if (warehouse == null) {
-      throw new WebApplicationException("Request body was not set.", 422);
-    }
-    if (warehouse.businessUnitCode == null || warehouse.businessUnitCode.isBlank()) {
-      throw new WebApplicationException("Warehouse businessUnitCode was not set on request.", 422);
-    }
-    if (warehouse.location == null || warehouse.location.isBlank()) {
-      throw new WebApplicationException("Warehouse location was not set on request.", 422);
-    }
-    if (warehouse.capacity == null) {
-      throw new WebApplicationException("Warehouse capacity was not set on request.", 422);
-    }
-    if (warehouse.stock == null) {
-      throw new WebApplicationException("Warehouse stock was not set on request.", 422);
-    }
-    if (warehouse.capacity <= 0) {
-      throw new WebApplicationException("Warehouse capacity must be > 0.", 422);
-    }
-    if (warehouse.stock < 0) {
-      throw new WebApplicationException("Warehouse stock must be >= 0.", 422);
-    }
-  }
-
 }
