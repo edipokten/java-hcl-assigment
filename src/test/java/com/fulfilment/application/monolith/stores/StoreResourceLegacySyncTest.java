@@ -71,6 +71,41 @@ class StoreResourceLegacySyncTest {
         assertEquals(0, recorder.createCalls.get());
     }
 
+    @Test
+    void shouldCallLegacyAfterDeleteCommit() {
+        Integer storeId =
+                given()
+                        .contentType(ContentType.JSON)
+                        .body("{\"name\":\"STORE-DELETE\",\"quantityProductsInStock\":7}")
+                        .when()
+                        .post("/store")
+                        .then()
+                        .statusCode(201)
+                        .extract()
+                        .path("id");
+
+        given()
+                .when()
+                .delete("/store/" + storeId)
+                .then()
+                .statusCode(204);
+
+        assertEquals(1, recorder.updateCalls.get());
+        assertEquals("STORE-DELETE", recorder.lastStore.name);
+        assertEquals(7, recorder.lastStore.quantityProductsInStock);
+    }
+
+    @Test
+    void shouldNotCallLegacyWhenDeleteTargetMissing() {
+        given()
+                .when()
+                .delete("/store/9999")
+                .then()
+                .statusCode(404);
+
+        assertEquals(0, recorder.updateCalls.get());
+    }
+
     static class RecordingLegacyStoreManagerGateway extends LegacyStoreManagerGateway {
         final AtomicInteger createCalls = new AtomicInteger();
         final AtomicInteger updateCalls = new AtomicInteger();
