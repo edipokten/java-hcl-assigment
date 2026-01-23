@@ -23,10 +23,9 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
 
   @Override
   public void create(Warehouse warehouse) {
-    validateRequiredFields(warehouse);
+    WarehouseUseCaseSupport.validateRequiredFields(warehouse);
 
-    warehouse.businessUnitCode = warehouse.businessUnitCode.trim();
-    warehouse.location = warehouse.location.trim();
+    WarehouseUseCaseSupport.normalizeWarehouse(warehouse);
 
     // Business Unit Code must be unique
     Warehouse existing = warehouseStore.findAnyByBusinessUnitCode(warehouse.businessUnitCode);
@@ -36,18 +35,15 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
     }
 
     // Location must exist
-    Location location = locationResolver.resolveByIdentifier(warehouse.location);
-    if (location == null) {
-      throw new WebApplicationException("Invalid warehouse location: " + warehouse.location, 422);
-    }
+    Location location = WarehouseUseCaseSupport.requireLocation(locationResolver, warehouse);
 
     // Validate capacity/stock per warehouse
-    validateCapacityAndStock(warehouse, location);
+    WarehouseUseCaseSupport.validateCapacityAndStock(warehouse, location);
 
     // Validate feasibility in that location (count + summed capacity)
     List<Warehouse> activeWarehouses = warehouseStore.getAll();
     long activeCountAtLocation =
-            activeWarehouses.stream().filter(w -> warehouse.location.equals(w.location)).count();
+            WarehouseUseCaseSupport.countActiveAtLocation(activeWarehouses, warehouse.location);
 
     if (activeCountAtLocation >= location.maxNumberOfWarehouses) {
       throw new WebApplicationException(
@@ -55,12 +51,7 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
     }
 
     int totalCapacityAtLocation =
-            activeWarehouses.stream()
-                    .filter(w -> warehouse.location.equals(w.location))
-                    .map(w -> w.capacity)
-                    .filter(c -> c != null)
-                    .mapToInt(Integer::intValue)
-                    .sum();
+            WarehouseUseCaseSupport.sumCapacityAtLocation(activeWarehouses, warehouse.location);
 
     if (totalCapacityAtLocation + warehouse.capacity > location.maxCapacity) {
       throw new WebApplicationException(
@@ -71,39 +62,5 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
     warehouse.archivedAt = null;
 
     warehouseStore.create(warehouse);
-  }
-
-  private void validateRequiredFields(Warehouse warehouse) {
-    if (warehouse == null) {
-      throw new WebApplicationException("Request body was not set.", 422);
-    }
-    if (warehouse.businessUnitCode == null || warehouse.businessUnitCode.isBlank()) {
-      throw new WebApplicationException("Warehouse businessUnitCode was not set on request.", 422);
-    }
-    if (warehouse.location == null || warehouse.location.isBlank()) {
-      throw new WebApplicationException("Warehouse location was not set on request.", 422);
-    }
-    if (warehouse.capacity == null) {
-      throw new WebApplicationException("Warehouse capacity was not set on request.", 422);
-    }
-    if (warehouse.stock == null) {
-      throw new WebApplicationException("Warehouse stock was not set on request.", 422);
-    }
-    if (warehouse.capacity <= 0) {
-      throw new WebApplicationException("Warehouse capacity must be > 0.", 422);
-    }
-    if (warehouse.stock < 0) {
-      throw new WebApplicationException("Warehouse stock must be >= 0.", 422);
-    }
-  }
-
-  private void validateCapacityAndStock(Warehouse warehouse, Location location) {
-    if (warehouse.capacity < warehouse.stock) {
-      throw new WebApplicationException("Warehouse capacity must accommodate stock.", 409);
-    }
-    if (warehouse.capacity > location.maxCapacity) {
-      throw new WebApplicationException(
-              "Warehouse capacity cannot exceed location max capacity.", 409);
-    }
   }
 }
